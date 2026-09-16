@@ -29,7 +29,7 @@ fi
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty; commit or stash first"
 
 # 8.6 concurrency — lockfile guards the whole run
-lock=".agent/run.lock"
+lock="$root/.agent/run.lock"
 mkdir "$lock" 2>/dev/null || die "another run is active (lock: $lock)"
 trap 'rm -rf "$lock"' EXIT
 
