@@ -10,6 +10,7 @@ dist/
 .agent/NOTES.md
 .agent/last-verify.log
 .agent/run.lock
+.agent/pr-body.md
 
 # test output
 tests/e2e/output/
