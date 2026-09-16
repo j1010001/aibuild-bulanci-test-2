@@ -17,6 +17,11 @@ test('home page loads with zero console errors', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('home page displays the headline', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('Hello, agent!')).toBeVisible();
+});
+
 test('practice mode renders a non-blank canvas', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Practice' }).click();
