@@ -1,0 +1,29 @@
+{
+  "name": "aibuild-bulanci-test-2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser Party Shooter, built one issue at a time by an agent loop.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "verify": "bash scripts/verify.sh"
+  },
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.3",
+    "@types/three": "^0.186.0",
+    "eslint": "^10.10.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11"
+  }
+}
