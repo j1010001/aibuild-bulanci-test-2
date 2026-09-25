@@ -3,15 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Browser Party Shooter, built one issue at a time by an agent loop.",
+  "description": "Browser Party Shooter.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test",
-    "verify": "bash scripts/verify.sh"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "three": "^0.186.0"
