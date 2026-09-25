@@ -1,14 +1,15 @@
 // Pure, deterministic simulation core. No DOM, no three.js, no WebRTC.
-// `step(state, input, dt)` is the only way state changes; it returns a new
-// state object and (future) a list of events. Keep it free of randomness and
-// wall-clock reads so it stays unit-testable and server-portable.
+// `step(state, inputs, dt)` is the only way state changes; it returns a new
+// state object. Free of randomness and wall-clock reads so it stays
+// unit-testable and server-portable.
 
 import type {
   CreateGameOptions,
   Direction,
   GameState,
-  Input,
+  Inputs,
   StepResult,
+  Vec2,
 } from './types';
 
 export const DEFAULTS = {
@@ -16,19 +17,17 @@ export const DEFAULTS = {
   boardHeight: 40,
   playerRadius: 0.5,
   playerSpeed: 6,
+  bulletSpeed: 18,
+  cadence: 0.8,
+  muzzleOffset: 0.75,
 } as const;
 
-const DIRECTION_VECTOR: Record<Direction, Vec2Like> = {
+const DIRECTION_VECTOR: Record<Direction, Vec2> = {
   up: { x: 0, y: -1 },
   down: { x: 0, y: 1 },
   left: { x: -1, y: 0 },
   right: { x: 1, y: 0 },
 };
-
-interface Vec2Like {
-  x: number;
-  y: number;
-}
 
 export function createGame(options: CreateGameOptions = {}): GameState {
   const config = {
@@ -36,38 +35,95 @@ export function createGame(options: CreateGameOptions = {}): GameState {
     boardHeight: options.boardHeight ?? DEFAULTS.boardHeight,
     playerRadius: DEFAULTS.playerRadius,
     playerSpeed: DEFAULTS.playerSpeed,
+    bulletSpeed: DEFAULTS.bulletSpeed,
+    cadence: DEFAULTS.cadence,
+    muzzleOffset: DEFAULTS.muzzleOffset,
   };
 
   return {
     config,
     phase: 'practice',
-    player: {
-      id: 'p1',
-      name: 'Player',
-      skinId: 0,
-      pos: { x: config.boardWidth / 2, y: config.boardHeight / 2 },
-      facing: 'right',
-    },
+    time: 0,
+    nextBulletId: 0,
+    players: [
+      {
+        id: 'p1',
+        name: 'Player',
+        skinId: 0,
+        pos: { x: config.boardWidth / 2, y: config.boardHeight / 2 },
+        facing: 'right',
+        lastShotAt: null,
+        alive: true,
+        connected: true,
+      },
+    ],
+    bullets: [],
   };
 }
 
-export function step(state: GameState, input: Input, dt: number): StepResult {
-  const { config, player } = state;
+export function step(state: GameState, inputs: Inputs, dt: number): StepResult {
+  const time = state.time + dt;
+  const config = state.config;
 
-  let x = player.pos.x;
-  let y = player.pos.y;
-  let facing = player.facing;
+  // 1. movement — axis-aligned, clamped to board bounds.
+  const players = state.players.map((player) => {
+    if (!player.alive) return player;
+    const input = inputs[player.id];
+    if (input === undefined || input.moveDir === null) return player;
 
-  if (input.moveDir !== null) {
-    facing = input.moveDir;
-    const v = DIRECTION_VECTOR[facing];
+    const v = DIRECTION_VECTOR[input.moveDir];
     const r = config.playerRadius;
-    x = clamp(x + v.x * config.playerSpeed * dt, r, config.boardWidth - r);
-    y = clamp(y + v.y * config.playerSpeed * dt, r, config.boardHeight - r);
+    const x = clamp(player.pos.x + v.x * config.playerSpeed * dt, r, config.boardWidth - r);
+    const y = clamp(player.pos.y + v.y * config.playerSpeed * dt, r, config.boardHeight - r);
+    return { ...player, pos: { x, y }, facing: input.moveDir };
+  });
+
+  // 2. shooting — a cadence-gated spawn at the muzzle, along facing.
+  let nextBulletId = state.nextBulletId;
+  const spawned: { id: number; ownerId: string; pos: Vec2; dir: Direction }[] = [];
+
+  const playersAfterShots = players.map((player) => {
+    if (!player.alive) return player;
+    const input = inputs[player.id];
+    if (input === undefined || !input.shoot) return player;
+    if (player.lastShotAt !== null && time - player.lastShotAt < config.cadence) {
+      return player;
+    }
+
+    const v = DIRECTION_VECTOR[player.facing];
+    spawned.push({
+      id: nextBulletId,
+      ownerId: player.id,
+      pos: {
+        x: player.pos.x + v.x * config.muzzleOffset,
+        y: player.pos.y + v.y * config.muzzleOffset,
+      },
+      dir: player.facing,
+    });
+    nextBulletId += 1;
+    return { ...player, lastShotAt: time };
+  });
+
+  // 3. bullets — advance and cull those that leave the board.
+  const bullets: typeof state.bullets = [];
+  for (const bullet of [...state.bullets, ...spawned]) {
+    const v = DIRECTION_VECTOR[bullet.dir];
+    const nx = bullet.pos.x + v.x * config.bulletSpeed * dt;
+    const ny = bullet.pos.y + v.y * config.bulletSpeed * dt;
+    if (nx < 0 || nx > config.boardWidth || ny < 0 || ny > config.boardHeight) {
+      continue;
+    }
+    bullets.push({ ...bullet, pos: { x: nx, y: ny } });
   }
 
   return {
-    state: { ...state, player: { ...player, pos: { x, y }, facing } },
+    state: {
+      ...state,
+      time,
+      nextBulletId,
+      players: playersAfterShots,
+      bullets,
+    },
     events: [],
   };
 }

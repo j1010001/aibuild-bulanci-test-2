@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createGame, step } from './sim/sim';
-import type { Direction, GameState, Input } from './sim/types';
+import type { Direction, GameState, Input, Inputs } from './sim/types';
 
 const KEY_TO_DIR: Record<string, Direction> = {
   ArrowUp: 'up',
@@ -28,10 +28,16 @@ const practiceBtn = document.getElementById('practice')!;
 
 let state: GameState | null = null;
 let heldDir: Direction | null = null;
+let shootPending = false;
 
 practiceBtn.addEventListener('click', startPractice);
 
 window.addEventListener('keydown', (event) => {
+  if (event.code === 'Space') {
+    shootPending = true;
+    event.preventDefault();
+    return;
+  }
   const dir = KEY_TO_DIR[event.code];
   if (dir !== undefined) {
     heldDir = dir;
@@ -104,7 +110,7 @@ function startPractice(): void {
   playerGroup.add(body, skirt);
   scene.add(playerGroup);
 
-  status.textContent = 'Practice — arrows / WASD / IJKL to move.';
+  status.textContent = 'Practice — arrows / WASD / IJKL to move, Space to shoot.';
 
   let lastMs = performance.now();
 
@@ -115,10 +121,12 @@ function startPractice(): void {
     lastMs = now;
 
     if (state !== null) {
-      const input: Input = { moveDir: heldDir };
-      const result = step(state, input, dt);
+      const input: Input = { moveDir: heldDir, shoot: shootPending };
+      const inputs: Inputs = { [state.players[0].id]: input };
+      shootPending = false;
+      const result = step(state, inputs, dt);
       state = result.state;
-      playerGroup.position.set(state.player.pos.x, 0, state.player.pos.y);
+      playerGroup.position.set(state.players[0].pos.x, 0, state.players[0].pos.y);
     }
 
     renderer.render(scene, camera);
@@ -133,6 +141,10 @@ if (import.meta.env.DEV) {
       return state === null ? null : JSON.parse(JSON.stringify(state));
     },
     press(key: string): void {
+      if (key === 'Space') {
+        shootPending = true;
+        return;
+      }
       const dir = KEY_TO_DIR[key];
       if (dir !== undefined) {
         heldDir = dir;
